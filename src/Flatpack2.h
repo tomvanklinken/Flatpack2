@@ -44,7 +44,7 @@ class Flatpack2
     static void setOutput(int, int, int, FLATPACK2_WALKIN =  FLATPACK2_WALKIN_5);
 
     static inline FLATPACK2_UNIT units[FLATPACK2_MAX_UNITS];
-    static inline int units_count ;
+    static inline int units_count = 0 ;
     static inline void (*onUpdate)(int) = 0;
   private:
      static void onReceive(int );

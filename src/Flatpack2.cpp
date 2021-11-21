@@ -2,9 +2,7 @@
 
 Flatpack2::Flatpack2()
 {
-  // Constructor
-  this->units_count = 0;
-  this->onUpdate = NULL;
+  // Not used as we are using only static methods
 }
 void Flatpack2::Start()
 {
