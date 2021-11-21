@@ -3,17 +3,17 @@
 Flatpack2::Flatpack2()
 {
   // Constructor
+  this->units_count = 0;
+  this->onUpdate = NULL;
 }
 void Flatpack2::Start()
 {
-
-  CAN.setClockFrequency(CAN_CLOCK_FREQUENCY);
+  // Start CAN communication
   if (!CAN.begin(CAN_SPEED)) {
     LOG_ERROR("Starting CAN failed!");
     while (1);
   }
-  CAN.onReceive(this->onReceive);
-
+  CAN.onReceive(Flatpack2::onReceive);
 }
 void Flatpack2::toHex(char *dst, uint8_t *data, int len)
 {
@@ -29,44 +29,32 @@ void Flatpack2::toHexReverse(char *dst, uint8_t *data, int len)
     sprintf(dst + i * 2, "%02X", data[len-i-1]);
   }
 }
-void Flatpack2::sendCAN(uint32_t packet_id, uint8_t * packet, int len)
+void Flatpack2::sendCAN(uint32_t packet_id, uint8_t * packet, int len, bool dry_run = false)
 {
   char str[256];
   char hexstr[32];
   
-  /*uint8_t * ptr;
-  ptr = (uint8_t*)&packet_id;
-  for(int i=0;i<4;i++)
-  {
-    snprintf(hexstr+i*2,3,"%02X",ptr[i]);
-  }*/
+  // Convert packet_id to hex for debug purposes
   Flatpack2::toHexReverse(hexstr,(uint8_t*)&packet_id,4);
-  snprintf(str, 256, "Sending CAN packet (s): ", hexstr ); 
+  
+  // Show packet to be send
+  snprintf(str, 256, "Sending CAN packet (%s): ", hexstr ); 
   for(int i=0;i<len;i++) 
   {
     snprintf(hexstr,3,"%02X",packet[i]);
     strcat(str, hexstr);
   }
   LOG_INFO(str);
-  CAN.beginExtendedPacket(packet_id);
-  for(int i=0;i<len;i++) CAN.write(packet[i]);
-  CAN.endPacket();
   
-}
-void Flatpack2::sendCAN2(uint32_t packet_id, uint8_t * packet, int len)
-{
-  char str[256];
-  char hexstr[32];
-
-  Flatpack2::toHexReverse(hexstr,(uint8_t*)&packet_id,4);
-  snprintf(str, 256, "Sending CAN packet (%s): ", hexstr);
-  for(int i=0;i<len;i++) 
+  if (! dry_run)
   {
-    sprintf(str,"%s%02X",str,packet[i]);
+    // Send actual packet
+    CAN.beginExtendedPacket(packet_id);
+    for(int i=0;i<len;i++) CAN.write(packet[i]);
+    CAN.endPacket();
   }
-  LOG_INFO(str);
-  
 }
+
 
 void Flatpack2::sendLogin(uint8_t * serialNumber, int id)
 {
@@ -79,33 +67,38 @@ void Flatpack2::sendLogin(uint8_t * serialNumber, int id)
   Flatpack2::sendCAN(packet_id, packet, 8);
 }
 
-
-void Flatpack2::setOutput(int current, int voltage, int overvoltage)
+void Flatpack2::setOutput(int current, int voltage, int overvoltage, FLATPACK2_WALKIN walkin = FLATPACK2_WALKIN_5)
 {
 
   uint32_t packet_id = 0x05FF4000;
-  packet_id |= 0x4; // 5 second walk-in
-  //packet_id != 0x5; // 60 second walk-in
+  switch(walkin)
+  {
+    case FLATPACK2_WALKIN_5:
+      packet_id |= 0x4; // 5 second walk-in
+      break;
+    case FLATPACK2_WALKIN_60:
+     packet_id != 0x5; // 60 second walk-in
+     break;
+  }
+  
   uint8_t data[8];
-  data[0] /* current           */ = current & 0x00ff;
-  data[1] /* current           */ = (current & 0xff00) >> 8;
-  data[2] /* output voltage 1  */ = voltage & 0x00ff;
-  data[3] /* output voltage 1  */ = (voltage & 0xff00) >> 8;
-  data[4] /* output voltage 2  */ = voltage & 0x00ff;
-  data[5] /* output voltage 2  */ = (voltage & 0xff00) >> 8;
-  data[6] /* overvoltage       */ = overvoltage & 0x00ff;
+  data[0] /* current           */ =  current     & 0x00ff;
+  data[1] /* current           */ = (current     & 0xff00) >> 8;
+  data[2] /* output voltage 1  */ =  voltage     & 0x00ff;
+  data[3] /* output voltage 1  */ = (voltage     & 0xff00) >> 8;
+  data[4] /* output voltage 2  */ =  voltage     & 0x00ff;
+  data[5] /* output voltage 2  */ = (voltage     & 0xff00) >> 8;
+  data[6] /* overvoltage       */ =  overvoltage & 0x00ff;
   data[7] /* overvoltage       */ = (overvoltage & 0xff00) >> 8;
   Flatpack2::sendCAN(packet_id, data, 8);
 }
-
-bool first_status = true;
 
 void Flatpack2::onReceive(int packetSize)
 {
   char output_msg[256]; 
   char tmp[32];
   
-  LOG_INFO("Flatpack2::onReceive()");
+  //LOG_INFO("Flatpack2::onReceive()");
 
   //strcpy(output_msg, "Received ");
 
@@ -147,22 +140,67 @@ void Flatpack2::onReceive(int packetSize)
       {
         uint8_t serialNumber[6];
         char serialNumberStr[13];
+        // Convert serialnumber to string
         for(int i=0;i<6;i++)
         {
           serialNumber[i] = packet[i + 1];
           serialNumberStr[i*2 + 0] =   ((packet[i + 1] & 0xf0) >> 4) + 48;
           serialNumberStr[i*2 + 1] =  (packet[i + 1] & 0x0f) + 48;
         }
-        serialNumberStr[12] = 0;
+        serialNumberStr[12] = '\0';
 
-        char str[256];
-        snprintf(str, 256 ,"Received CAN BUS Introduction packet from %s",serialNumberStr);
-        LOG_INFO(str);
 
-        // Send a login packet
-        // See if we already know this power supply
-        // Do not login every time
-        Flatpack2::sendLogin(serialNumber,1);
+        LOG_INFO("Received CAN BUS Introduction packet from",serialNumberStr);
+
+        // Search for charger
+        int i,id = -1;
+        for(i = 0; i< Flatpack2::units_count; i++)
+        {
+          if (memcmp(Flatpack2::units[i].serial,serialNumber,6) == 0)
+          {
+            id = Flatpack2::units[i].id;
+            break;
+          }
+        }
+        if (id == -1 && Flatpack2::units_count < FLATPACK2_MAX_UNITS)
+        {
+          i = Flatpack2::units_count;
+          id = i + 1; // Array starts from 0, units starts from 1
+          Flatpack2::units_count++; // Increment counter
+          Flatpack2::units[i].id = id;
+          memcpy(Flatpack2::units[i].serial, serialNumber, 6);
+          strcpy(Flatpack2::units[i].serialStr, serialNumberStr);
+          Flatpack2::units[i].lastupdate = 0; // Never updated
+          Flatpack2::units[i].lastlogin = 0;  // Never logged in
+        }
+
+        //LOG_INFO("Charger ",serialNumberStr, " has id ", id);
+
+        if (id >= 0)
+        {
+            Flatpack2::sendLogin(serialNumber,id);
+            Flatpack2::units[i].lastlogin = millis();
+        } else {
+          LOG_ERROR("Too many chargers ", Flatpack2::units_count);
+        }
+  /*     
+       
+        
+        {
+               LOG_INFO("NIER HIER");
+         
+          {
+            id = Flatpack2::units[j].id;
+            snprintf(str, 256, "Found charger %s with id %i", serialNumberStr, id);
+            LOG_INFO(str);
+          }
+        }
+ if (id == -1)
+        {
+            snprintf(str, 256, "Charger %s not found", serialNumberStr);
+            LOG_INFO(str);
+        }*/
+        
       }
   
     } else if ( (packet_id & 0xFF00FF00) == 0x05004000 && packetSize == 8) {
@@ -173,7 +211,6 @@ void Flatpack2::onReceive(int packetSize)
       // 08 current-limiting active
       // 10 Walk in (voltage ramping up)
       // 0C Alarm
-      
       char str[256];
 
       uint8_t data[8];
@@ -185,15 +222,53 @@ void Flatpack2::onReceive(int packetSize)
       int output_voltage = data[4] << 8 | data[3];
 
 
-      snprintf(str,256,"Received status from power supply %i, state=%i. intake_temp=%i, output_temp=%i, input_voltage=%i, output_current=%i, output_voltage=%i", 
-               id, state, intake_temp, output_temp, input_voltage, output_current, output_voltage);
-      LOG_INFO(str);
-
+      // Search for charger
+      int i;
+      bool found = false;
+      for(i = 0; i< Flatpack2::units_count; i++)
+      {
+        if (Flatpack2::units[i].id == id)
+        {
+          found = true;
+          Flatpack2::units[i].lastupdate     = millis();
+          switch(state)
+          {
+            case 0x04:
+              Flatpack2::units[i].status     =  FLATPACK2_STATUS_NORMAL;
+              break;
+            case 0x08:
+              Flatpack2::units[i].status     =  FLATPACK2_STATUS_CURRENT_LIMIT;
+              break;
+            case 0x10:
+              Flatpack2::units[i].status     =  FLATPACK2_STATUS_WALK_IN;
+              break;
+            case 0x0C:
+              Flatpack2::units[i].status     =  FLATPACK2_STATUS_ALARM;
+              break;
+            default:
+              Flatpack2::units[i].status     =  FLATPACK2_STATUS_UNKNOWN;
+              break;
+          }
+          Flatpack2::units[i].intake_temp    = intake_temp;
+          Flatpack2::units[i].output_temp    = output_temp;
+          Flatpack2::units[i].input_voltage  = input_voltage;
+          Flatpack2::units[i].output_current = output_current;
+          Flatpack2::units[i].output_voltage = output_voltage;
+          // Call callback if available
+          if (Flatpack2::onUpdate != NULL){
+            (*(Flatpack2::onUpdate))(i);
+          }
+        }
+      }
+      if (!found)
+      {
+        LOG_ERROR("Received status from charger ",id,", but charger not found");
+      }
       //if (first_status)
       //{
        // first_status = false;
         //Flatpack2::setOutput(100, 5700, 5950);
-      Flatpack2::setOutput(10, 5200, 5950);
+      //Flatpack2::setOutput(10, 5200, 5950);
       //  Flatpack2::setOutput(10, 4800, 5950);
       //}
     } else {

@@ -4,42 +4,55 @@
 #include <CAN.h>
 #include <DebugLog.h>
 
-#define CAN_CLOCK_FREQUENCY   8E6 /* 8Mhz clock frequency for Arduino UNO */
 #define CAN_SPEED           125E3 /* CAN Speed 125 kbps */
+#define FLATPACK2_MAX_UNITS 4     /* Maximum number of chargers */
 
-
-      // 04 normal voltage reached
-      // 08 current-limiting active
-      // 10 Walk in (voltage ramping up)
-      // 0C Alarm
-      
 enum FLATPACK2_STATUS
 {
-  FLATPACK2_STATUS_NORMAL,
-  FLATPACK2_STATUS_CURRENT_LIMIT,
-  FLATPACK2_STATUS_WALK_IN,
-  FLATPACK2_STATUS_ALARM
+  FLATPACK2_STATUS_NORMAL,        // 04 normal voltage reached
+  FLATPACK2_STATUS_CURRENT_LIMIT, // 08 current-limiting active
+  FLATPACK2_STATUS_WALK_IN,       // 10 Walk in (voltage ramping up)
+  FLATPACK2_STATUS_ALARM,         // 0C Alarm
+  FLATPACK2_STATUS_UNKNOWN        // unknown response
 };
+
+enum FLATPACK2_WALKIN
+{
+  FLATPACK2_WALKIN_5, // 5 second walk-in
+  FLATPACK2_WALKIN_60 // 60 second walk-in
+};
+
 struct FLATPACK2_UNIT {
-  int id;
-  uint8_t serial[6];
-  char serialStr[13];
-  FLATPACK2_STATUS status;
+  int              id;             // ID of charger (first charger is 1, second is 2, etc)
+  uint8_t          serial[6];      // Serialnumber in binary format
+  char             serialStr[13];  // Serialnumber in string format
+  unsigned long    lastupdate;     // Last time object was updated (millis())
+  unsigned long    lastlogin;      // Last time login packet was send
+  FLATPACK2_STATUS status;         // Current status of charger
+  int              intake_temp;    // Temperature in centigrade of intake
+  int              output_temp;    // Temperature in centigrade of exhaust
+  int              input_voltage ; // Input voltage in volts
+  int              output_current; // Output current in deciamps (10 deciamps = 1 amp)
+  int              output_voltage; // Output voltage in centivolts (100 centivolt = 1 volt)
 };
 
 class Flatpack2
 {
   public:
     Flatpack2();
-    void Start();
+    static void Start();
+    static void setOutput(int, int, int, FLATPACK2_WALKIN =  FLATPACK2_WALKIN_5);
+
+    static inline FLATPACK2_UNIT units[FLATPACK2_MAX_UNITS];
+    static inline int units_count ;
+    static inline void (*onUpdate)(int) = 0;
   private:
-    static void onReceive(int );
-    static void sendLogin(uint8_t *, int );
-    static void sendCAN(uint32_t , uint8_t * , int );
-    static void sendCAN2(uint32_t , uint8_t * , int );
-    static void setOutput(int, int, int );
-    static void Flatpack2::toHex(char *dst, uint8_t *data, int len);
-    static void Flatpack2::toHexReverse(char *dst, uint8_t *data, int len);
+     static void onReceive(int );
+     static void sendLogin(uint8_t *, int );
+     static void sendCAN(uint32_t , uint8_t * , int, bool = false );
+     static void Flatpack2::toHex(char *dst, uint8_t *data, int len);
+     static void Flatpack2::toHexReverse(char *dst, uint8_t *data, int len);
 };
+
 
 #endif
