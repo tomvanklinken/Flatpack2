@@ -21,10 +21,9 @@ but I wanted a library so my program code would be more clean.
 - https://github.com/the6p4c/Flatpack2
 - https://github.com/Lennart-O/ESP32_ELTEK_FLATPACK
 - https://github.com/neg2led/flatpack2s2
-- https://vk4ghz.com/product/eltek-flatpack2-24-48v-touchscreen-controller-kit/
-- https://vk4ghz.com/wordpress/wp-content/uploads/Eltek-Flatpack2-Controller-User-Guide-29-07-2020.pdf
 - https://electricmotorcycleforum.com/boards/index.php?topic=6405.135;wap2
 - https://www.elithion.com/lithiumate/php/eltek.php
+- https://dta0yqvfnusiq.cloudfront.net/conle38747825/2018/07/Flatpack2-HE-Front-End-5b44b5d5e3926.pdf
 
 ### Dependencies
 - https://github.com/sandeepmistry/arduino-CAN
