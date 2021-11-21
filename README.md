@@ -15,7 +15,7 @@ but I wanted a library so my program code would be more clean.
 - Test with other revisions and multiple devices on bus
 - Test current limit
 - Add bootup voltage
-- Cleanup receive code
+- Cleanup receive code & debug messages
 
 ### Thanks to
 - https://github.com/the6p4c/Flatpack2
@@ -31,6 +31,12 @@ but I wanted a library so my program code would be more clean.
 
 ### Status
 Code is very alpha currently.
+
+## Install
+```sh
+cd ~/Documents/Arduino/libraries/
+git clone https://github.com/tomvanklinken/Flatpack2 Flatpack2
+```
 
 ### Compatibility
 
