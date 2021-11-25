@@ -1,5 +1,11 @@
 #include <Flatpack2.h>
 
+
+int Flatpack2::units_count = 0 ;
+void (*Flatpack2::onUpdate)(int) = NULL;
+FLATPACK2_UNIT Flatpack2::units[FLATPACK2_MAX_UNITS];
+
+
 Flatpack2::Flatpack2()
 {
   // Not used as we are using only static methods
@@ -27,28 +33,32 @@ void Flatpack2::toHexReverse(char *dst, uint8_t *data, int len)
     sprintf(dst + i * 2, "%02X", data[len-i-1]);
   }
 }
-void Flatpack2::sendCAN(uint32_t packet_id, uint8_t * packet, int len, bool dry_run = false)
+void Flatpack2::sendCAN(long packet_id, uint8_t * packet, int len, bool dry_run)
 {
-  char str[256];
-  char hexstr[32];
+  char hexstr[16];
+  char packetstr[64];
   
+
+
   // Convert packet_id to hex for debug purposes
-  Flatpack2::toHexReverse(hexstr,(uint8_t*)&packet_id,4);
-  
+  Flatpack2::toHexReverse(hexstr,(uint8_t*)&packet_id,sizeof(long));
+  Flatpack2::toHex(packetstr,packet,len);
+  LOG_INFO("Sending CAN packet (",hexstr,") (len=",len,"): ",packetstr);
+
   // Show packet to be send
-  snprintf(str, 256, "Sending CAN packet (%s): ", hexstr ); 
+  /*snprintf(str, 64, "Sending CAN packet (%s): ", hexstr ); 
   for(int i=0;i<len;i++) 
   {
     snprintf(hexstr,3,"%02X",packet[i]);
     strcat(str, hexstr);
   }
-  LOG_INFO(str);
+  LOG_INFO(str);*/
   
   if (! dry_run)
   {
     // Send actual packet
     CAN.beginExtendedPacket(packet_id);
-    for(int i=0;i<len;i++) CAN.write(packet[i]);
+    CAN.write(packet, len);
     CAN.endPacket();
   }
 }
@@ -65,7 +75,7 @@ void Flatpack2::sendLogin(uint8_t * serialNumber, int id)
   Flatpack2::sendCAN(packet_id, packet, 8);
 }
 
-void Flatpack2::setOutput(int current, int voltage, int overvoltage, FLATPACK2_WALKIN walkin = FLATPACK2_WALKIN_5)
+void Flatpack2::setOutput(int current, int voltage, int overvoltage, FLATPACK2_WALKIN walkin)
 {
 
   uint32_t packet_id = 0x05FF4000;
@@ -96,7 +106,7 @@ void Flatpack2::onReceive(int packetSize)
   char output_msg[256]; 
   char tmp[32];
   
-  //LOG_INFO("Flatpack2::onReceive()");
+  LOG_INFO("Flatpack2::onReceive()");
 
   //strcpy(output_msg, "Received ");
 
@@ -176,8 +186,14 @@ void Flatpack2::onReceive(int packetSize)
 
         if (id >= 0)
         {
+          unsigned long t = millis();
+          if (Flatpack2::units[i].lastlogin == 0 || (t-Flatpack2::units[i].lastlogin) > 10000)
+          {
             Flatpack2::sendLogin(serialNumber,id);
             Flatpack2::units[i].lastlogin = millis();
+          } else {
+            LOG_INFO("Skipping login packet");
+          }
         } else {
           LOG_ERROR("Too many chargers ", Flatpack2::units_count);
         }
@@ -281,6 +297,5 @@ void Flatpack2::onReceive(int packetSize)
       Serial.println();*/
     }
   }
-
 
 }

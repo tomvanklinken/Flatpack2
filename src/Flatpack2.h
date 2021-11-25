@@ -43,15 +43,15 @@ class Flatpack2
     static void Start();
     static void setOutput(int, int, int, FLATPACK2_WALKIN =  FLATPACK2_WALKIN_5);
 
-    static inline FLATPACK2_UNIT units[FLATPACK2_MAX_UNITS];
-    static inline int units_count = 0 ;
-    static inline void (*onUpdate)(int) = 0;
+    static /*inline*/ FLATPACK2_UNIT units[FLATPACK2_MAX_UNITS];
+    static /*inline*/ int units_count/* = 0*/ ;
+    static /*inline*/ void (*onUpdate)(int)/* = 0*/;
   private:
      static void onReceive(int );
      static void sendLogin(uint8_t *, int );
-     static void sendCAN(uint32_t , uint8_t * , int, bool = false );
-     static void Flatpack2::toHex(char *dst, uint8_t *data, int len);
-     static void Flatpack2::toHexReverse(char *dst, uint8_t *data, int len);
+     static void sendCAN(long , uint8_t * , int, bool = false );
+     static void toHex(char *dst, uint8_t *data, int len);
+     static void toHexReverse(char *dst, uint8_t *data, int len);
 };
 
 

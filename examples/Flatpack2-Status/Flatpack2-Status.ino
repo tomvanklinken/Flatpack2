@@ -41,7 +41,10 @@ void setup() {
   LOG_INFO("Flatpack2 example");
 
   // Set CAN options for your board here
+#ifndef ARDUINO_ARCH_ESP32
   CAN.setClockFrequency(8E6); /* 8Mhz clock frequency for Arduino UNO */
+#endif
+
   // Start communication with Flatpack2
   Flatpack2::onUpdate = &onUpdate;
   Flatpack2::Start();
